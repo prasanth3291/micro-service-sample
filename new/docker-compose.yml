@@ -1,0 +1,90 @@
+version: '3.8'
+services:
+  post-web:
+    image: posts
+    command: "python manage.py runserver 0.0.0.0:8000"
+    ports:
+      - 8000:8000      
+    depends_on:
+      post-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+  queue:
+    image: posts
+    command: "python consumer.py"       
+    depends_on:
+      post-db:
+        condition: service_healthy 
+      rabbitmq:
+        condition: service_healthy       
+       
+
+  post-db:
+    image: postgres:latest
+    restart: always    
+    environment:
+      POSTGRES_DB: posts_service
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 12345
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      retries: 5
+      start_period: 30s
+      timeout: 5s 
+    ports:
+      - 5435:5432
+    volumes:
+      - "${PWD}/db-data:/var/lib/postgresql/data:z"
+
+  web:
+    image: acounts:latest
+    ports:
+      - 8001:8000  
+    depends_on:
+      - db
+      - post-web
+
+  db:
+    image: postgres:latest
+    restart: always
+    environment:
+      POSTGRES_DB: user_service
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 12345
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      retries: 5
+      start_period: 30s
+      timeout: 5s
+    ports:
+      - 5434:5432
+    volumes:
+      - "${PWD}/db-data:/var/lib/postgresql/data:z"
+    depends_on:
+      - post-db  
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - "5673:5672"
+      - "15673:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmqctl", "status"]
+      interval: 30s
+      retries: 5  
+    
+
+  react-app:
+    # Use the existing frontend:latest image
+    image: prasanth3291/frontend:latest
+    # Expose port 3000 to access the React app
+    ports:
+      - "3000:3000"
+    
+   
+
+
+
